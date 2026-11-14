@@ -2,7 +2,7 @@ import argparse
 import os
 
 from lokillo.config import DEFAULT_PROVIDER, DEFAULT_SYSTEM_PROMPT, PROVIDERS
-from lokillo.models import Conversation
+from lokillo.models import Conversation, Message
 from lokillo.repository import ConversationRepository
 
 PREVIEW_LENGTH = 50
@@ -122,3 +122,21 @@ def resolve_system_prompt(
     if conversation and conversation.messages:
         return conversation.messages[-1].system_prompt
     return DEFAULT_SYSTEM_PROMPT
+
+
+def format_usage(message: Message) -> str:
+    """Formats the message's token usage and cost for display."""
+    if message.input_tokens is None:
+        return "[usage not reported by the provider]"
+
+    if message.cost is None:
+        cost = "unknown (no pricing for this model)"
+    elif message.cost == 0:
+        cost = "$0 (local)"
+    else:
+        cost = f"${message.cost:.6f}"
+
+    return (
+        f"[tokens: {message.input_tokens} in / "
+        f"{message.output_tokens} out · cost: {cost}]"
+    )

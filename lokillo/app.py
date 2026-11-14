@@ -3,12 +3,14 @@ from dotenv import load_dotenv
 from lokillo.chat import ChatService
 from lokillo.cli import (
     delete_conversation,
+    format_usage,
     parse_args,
     print_conversations,
     resolve_conversation,
     resolve_system_prompt,
 )
 from lokillo.config import create_client, load_provider_settings
+from lokillo.pricing import get_pricing
 from lokillo.repository import ConversationRepository
 
 EXIT_COMMAND = "exit"
@@ -31,6 +33,7 @@ def run_chat(chat: ChatService) -> None:
         for chunk in chat.send(user_input):
             print(chunk, end="", flush=True)
         print()
+        print(format_usage(chat.last_message))
 
 
 def main() -> None:
@@ -56,6 +59,7 @@ def main() -> None:
             instructions=resolve_system_prompt(args.system, conversation),
             temperature=args.temperature,
             conversation=conversation,
+            pricing=get_pricing(settings.name, settings.model),
         )
         run_chat(chat)
     finally:

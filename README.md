@@ -83,6 +83,7 @@ python main.py --delete 1    # delete conversation 1 and its messages
 ## How it works
 
 - **Memory:** the full user/assistant history is loaded from the database and sent with every request, so the model keeps the context. This works with any OpenAI-compatible provider, including local models served by Ollama.
+- **Usage and cost:** after each reply, the input/output tokens and the estimated cost in USD are shown, e.g. `[tokens: 153 in / 25 out · cost: $0.000028]`. Prices live in `lokillo/pricing.py`; local Ollama models cost $0, and models without a price show `unknown`.
 - **Storage:** after each response, the conversation is saved to a SQLite database (`data/conversations.db`) with two tables: `conversations` and `messages`. The database and tables are created automatically.
 
 To query the history:
@@ -102,6 +103,7 @@ sqlite3 data/conversations.db "SELECT user_prompt, output_text FROM messages WHE
 │   ├── config.py            # Provider settings (OpenAI / Ollama) and client factory
 │   ├── chat.py              # ChatService: API calls and session memory
 │   ├── models.py            # Message and Conversation models (Pydantic)
+│   ├── pricing.py           # Model prices and cost calculation
 │   └── repository.py        # SQLite persistence
 ├── data/
 │   └── conversations.db     # Local history (created automatically, not versioned)

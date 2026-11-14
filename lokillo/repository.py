@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS messages (
     user_prompt     TEXT NOT NULL,
     system_prompt   TEXT NOT NULL,
     output_text     TEXT NOT NULL DEFAULT '',
+    input_tokens    INTEGER,
+    output_tokens   INTEGER,
+    cost            REAL,
     created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -32,8 +35,14 @@ INSERT_CONVERSATION = "INSERT INTO conversations DEFAULT VALUES"
 DELETE_CONVERSATION = "DELETE FROM conversations WHERE id = :conversation_id"
 
 INSERT_MESSAGE = """
-INSERT INTO messages (conversation_id, user_prompt, system_prompt, output_text)
-VALUES (:conversation_id, :user_prompt, :system_prompt, :output_text)
+INSERT INTO messages (
+    conversation_id, user_prompt, system_prompt, output_text,
+    input_tokens, output_tokens, cost
+)
+VALUES (
+    :conversation_id, :user_prompt, :system_prompt, :output_text,
+    :input_tokens, :output_tokens, :cost
+)
 """
 
 TOUCH_CONVERSATION = """
@@ -49,7 +58,8 @@ WHERE id = :conversation_id
 """
 
 SELECT_MESSAGES = """
-SELECT user_prompt, system_prompt, output_text
+SELECT user_prompt, system_prompt, output_text,
+       input_tokens, output_tokens, cost
 FROM messages
 WHERE conversation_id = :conversation_id
 ORDER BY id
