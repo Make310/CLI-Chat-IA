@@ -1,16 +1,16 @@
 import sqlite3
 from pathlib import Path
 
-from models import Conversation, ConversationSummary, Message
+from lokillo.models import Conversation, ConversationSummary, Message
 
-DEFAULT_DB_PATH = Path("conversations.db")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_DB_PATH = PROJECT_ROOT / "data" / "conversations.db"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS conversations (
-    id               INTEGER PRIMARY KEY AUTOINCREMENT,
-    last_response_id TEXT,
-    created_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at       TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS messages (
@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS messages (
     user_prompt     TEXT NOT NULL,
     system_prompt   TEXT NOT NULL,
     output_text     TEXT NOT NULL DEFAULT '',
+    input_tokens    INTEGER,
+    output_tokens   INTEGER,
+    cost            REAL,
     created_at      TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -29,22 +32,37 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation
 
 INSERT_CONVERSATION = "INSERT INTO conversations DEFAULT VALUES"
 
+DELETE_CONVERSATION = "DELETE FROM conversations WHERE id = :conversation_id"
+
 INSERT_MESSAGE = """
-INSERT INTO messages (conversation_id, user_prompt, system_prompt, output_text)
-VALUES (:conversation_id, :user_prompt, :system_prompt, :output_text)
+INSERT INTO messages (
+    conversation_id, user_prompt, system_prompt, output_text,
+    input_tokens, output_tokens, cost
+)
+VALUES (
+    :conversation_id, :user_prompt, :system_prompt, :output_text,
+    :input_tokens, :output_tokens, :cost
+)
 """
 
-UPDATE_LAST_RESPONSE = """
+TOUCH_CONVERSATION = """
 UPDATE conversations
-SET last_response_id = :last_response_id,
-    updated_at = CURRENT_TIMESTAMP
+SET updated_at = CURRENT_TIMESTAMP
 WHERE id = :conversation_id
 """
 
 SELECT_CONVERSATION = """
-SELECT id, last_response_id
+SELECT id
 FROM conversations
 WHERE id = :conversation_id
+"""
+
+SELECT_MESSAGES = """
+SELECT user_prompt, system_prompt, output_text,
+       input_tokens, output_tokens, cost
+FROM messages
+WHERE conversation_id = :conversation_id
+ORDER BY id
 """
 
 SELECT_RECENT_CONVERSATIONS = """
@@ -70,6 +88,8 @@ class ConversationRepository:
     """Persists conversations and messages in SQLite."""
 
     def __init__(self, db_path: str | Path = DEFAULT_DB_PATH):
+        db_path = Path(db_path)
+        db_path.parent.mkdir(parents=True, exist_ok=True)
         self.connection = sqlite3.connect(db_path)
         self.connection.row_factory = sqlite3.Row
         self.connection.execute("PRAGMA foreign_keys = ON")
@@ -81,12 +101,7 @@ class ConversationRepository:
             cursor = self.connection.execute(INSERT_CONVERSATION)
         return cursor.lastrowid
 
-    def add_message(
-        self,
-        conversation_id: int,
-        message: Message,
-        last_response_id: str,
-    ) -> None:
+    def add_message(self, conversation_id: int, message: Message) -> None:
         """Saves the message and updates the conversation atomically."""
         with self.connection:
             self.connection.execute(
@@ -94,22 +109,30 @@ class ConversationRepository:
                 {"conversation_id": conversation_id, **message.model_dump()},
             )
             self.connection.execute(
-                UPDATE_LAST_RESPONSE,
-                {
-                    "conversation_id": conversation_id,
-                    "last_response_id": last_response_id,
-                },
+                TOUCH_CONVERSATION,
+                {"conversation_id": conversation_id},
             )
 
     def get_conversation(self, conversation_id: int) -> Conversation | None:
-        """Returns the conversation, or None if it does not exist."""
+        """Returns the conversation with its messages, or None."""
         row = self.connection.execute(
             SELECT_CONVERSATION,
             {"conversation_id": conversation_id},
         ).fetchone()
         if row is None:
             return None
-        return Conversation(**row)
+        return Conversation(
+            id=row["id"],
+            messages=self._get_messages(conversation_id),
+        )
+
+    def _get_messages(self, conversation_id: int) -> list[Message]:
+        """Returns the conversation's messages in chronological order."""
+        rows = self.connection.execute(
+            SELECT_MESSAGES,
+            {"conversation_id": conversation_id},
+        ).fetchall()
+        return [Message(**row) for row in rows]
 
     def list_conversations(self, limit: int = 10) -> list[ConversationSummary]:
         """Returns the most recent conversations that have messages."""
@@ -118,6 +141,18 @@ class ConversationRepository:
             {"limit": limit},
         ).fetchall()
         return [ConversationSummary(**row) for row in rows]
+
+    def delete_conversation(self, conversation_id: int) -> bool:
+        """Deletes the conversation and its messages.
+
+        Returns False if the conversation does not exist.
+        """
+        with self.connection:
+            cursor = self.connection.execute(
+                DELETE_CONVERSATION,
+                {"conversation_id": conversation_id},
+            )
+        return cursor.rowcount > 0
 
     def close(self) -> None:
         """Closes the database connection."""
