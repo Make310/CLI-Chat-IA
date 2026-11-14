@@ -13,15 +13,17 @@ class ChatService:
         self.conversation = Conversation()
 
     def send(self, user_input: str) -> str:
+        if self.conversation.id is None:
+            self.conversation.id = self.repository.create_conversation()
+
         response = self.client.responses.create(
             model=self.model,
             instructions=self.instructions,
             input=user_input,
-            previous_response_id=self.conversation.conversation_id,
+            previous_response_id=self.conversation.last_response_id,
         )
-        self.conversation.conversation_id = response.id
-        self.conversation.add_message(
-            Message(user_prompt=user_input, system_prompt=self.instructions, output_text=response.output_text)
-        )
-        self.repository.save(self.conversation)
+
+        message = Message(user_prompt=user_input, system_prompt=self.instructions, output_text=response.output_text)
+        self.conversation.last_response_id = response.id
+        self.repository.add_message(self.conversation.id, message, response.id)
         return response.output_text

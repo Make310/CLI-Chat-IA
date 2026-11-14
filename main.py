@@ -14,24 +14,28 @@ INSTRUCTIONS = (
 
 def main() -> None:
     load_dotenv()
+    repository = ConversationRepository()
     chat = ChatService(
         client=OpenAI(api_key=os.getenv("api_key")),
-        repository=ConversationRepository(),
+        repository=repository,
         model=os.getenv("model", "gpt-6-luna"),
         instructions=INSTRUCTIONS,
     )
 
-    while True:
-        try:
-            user_input = input("You: ").strip()
-        except (KeyboardInterrupt, EOFError):
-            break
-        if not user_input:
-            print("Please enter a message.")
-            continue
-        if user_input.lower() == "exit":
-            break
-        print(f"Lokillo: {chat.send(user_input)}")
+    try:
+        while True:
+            try:
+                user_input = input("You: ").strip()
+            except (KeyboardInterrupt, EOFError):
+                break
+            if not user_input:
+                print("Please enter a message.")
+                continue
+            if user_input.lower() == "exit":
+                break
+            print(f"Lokillo: {chat.send(user_input)}")
+    finally:
+        repository.close()
 
 
 if __name__ == "__main__":
