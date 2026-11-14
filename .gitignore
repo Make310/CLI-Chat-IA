@@ -1,0 +1,18 @@
+# Entorno virtual
+venv/
+.venv/
+
+# Variables de entorno (API keys)
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Datos locales de las conversaciones
+conversations.json
+
+# Sistema / editor
+.DS_Store
+.vscode/
+.idea/
