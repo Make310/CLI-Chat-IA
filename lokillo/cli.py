@@ -1,13 +1,21 @@
 import argparse
+import os
 
-from models import Conversation
-from repository import ConversationRepository
+from lokillo.config import DEFAULT_PROVIDER, PROVIDERS
+from lokillo.models import Conversation
+from lokillo.repository import ConversationRepository
 
 PREVIEW_LENGTH = 50
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Lokillo CLI chat")
+    parser.add_argument(
+        "--provider",
+        choices=PROVIDERS,
+        default=os.getenv("PROVIDER", DEFAULT_PROVIDER),
+        help="LLM provider to use (default: PROVIDER from .env)",
+    )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "--list",

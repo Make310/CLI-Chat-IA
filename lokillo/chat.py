@@ -1,7 +1,7 @@
 from openai import OpenAI
 
-from models import Conversation, Message
-from repository import ConversationRepository
+from lokillo.models import Conversation, Message
+from lokillo.repository import ConversationRepository
 
 
 class ChatService:
@@ -22,15 +22,14 @@ class ChatService:
         self.conversation = conversation or Conversation()
 
     def send(self, user_input: str) -> str:
-        """Sends the user input and returns the model's reply."""
+        """Sends the user input with the full history and returns the reply."""
         if self.conversation.id is None:
             self.conversation.id = self.repository.create_conversation()
 
         response = self.client.responses.create(
             model=self.model,
             instructions=self.instructions,
-            input=user_input,
-            previous_response_id=self.conversation.last_response_id,
+            input=self._build_input(user_input),
         )
 
         message = Message(
@@ -38,6 +37,17 @@ class ChatService:
             system_prompt=self.instructions,
             output_text=response.output_text,
         )
-        self.conversation.last_response_id = response.id
-        self.repository.add_message(self.conversation.id, message, response.id)
+        self.repository.add_message(self.conversation.id, message)
+        self.conversation.messages.append(message)
         return response.output_text
+
+    def _build_input(self, user_input: str) -> list[dict[str, str]]:
+        """Builds the user/assistant history followed by the new prompt."""
+        history = []
+        for message in self.conversation.messages:
+            history.append({"role": "user", "content": message.user_prompt})
+            history.append(
+                {"role": "assistant", "content": message.output_text}
+            )
+        history.append({"role": "user", "content": user_input})
+        return history
