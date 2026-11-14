@@ -29,6 +29,8 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation
 
 INSERT_CONVERSATION = "INSERT INTO conversations DEFAULT VALUES"
 
+DELETE_CONVERSATION = "DELETE FROM conversations WHERE id = :conversation_id"
+
 INSERT_MESSAGE = """
 INSERT INTO messages (conversation_id, user_prompt, system_prompt, output_text)
 VALUES (:conversation_id, :user_prompt, :system_prompt, :output_text)
@@ -129,6 +131,18 @@ class ConversationRepository:
             {"limit": limit},
         ).fetchall()
         return [ConversationSummary(**row) for row in rows]
+
+    def delete_conversation(self, conversation_id: int) -> bool:
+        """Deletes the conversation and its messages.
+
+        Returns False if the conversation does not exist.
+        """
+        with self.connection:
+            cursor = self.connection.execute(
+                DELETE_CONVERSATION,
+                {"conversation_id": conversation_id},
+            )
+        return cursor.rowcount > 0
 
     def close(self) -> None:
         """Closes the database connection."""

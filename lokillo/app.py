@@ -1,14 +1,16 @@
 from dotenv import load_dotenv
 
 from lokillo.chat import ChatService
-from lokillo.cli import parse_args, print_conversations, resolve_conversation
+from lokillo.cli import (
+    delete_conversation,
+    parse_args,
+    print_conversations,
+    resolve_conversation,
+    resolve_system_prompt,
+)
 from lokillo.config import create_client, load_provider_settings
 from lokillo.repository import ConversationRepository
 
-INSTRUCTIONS = (
-    "Tu eres un compañero que habla con jerga y acento de la costa atlantica "
-    "colombiana, tienes el acento bastante marcado"
-)
 EXIT_COMMAND = "exit"
 
 
@@ -25,7 +27,10 @@ def run_chat(chat: ChatService) -> None:
         if user_input.lower() == EXIT_COMMAND:
             break
 
-        print(f"Lokillo: {chat.send(user_input)}")
+        print("Lokillo: ", end="", flush=True)
+        for chunk in chat.send(user_input):
+            print(chunk, end="", flush=True)
+        print()
 
 
 def main() -> None:
@@ -37,15 +42,19 @@ def main() -> None:
         if args.list:
             print_conversations(repository)
             return
+        if args.delete is not None:
+            delete_conversation(repository, args.delete)
+            return
 
         conversation = resolve_conversation(repository, args.resume)
-        settings = load_provider_settings(args.provider)
+        settings = load_provider_settings(args.provider, args.model)
         print(f"Using {settings.name} ({settings.model}).")
         chat = ChatService(
             client=create_client(settings),
             repository=repository,
             model=settings.model,
-            instructions=INSTRUCTIONS,
+            instructions=resolve_system_prompt(args.system, conversation),
+            temperature=args.temperature,
             conversation=conversation,
         )
         run_chat(chat)

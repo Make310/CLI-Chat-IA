@@ -51,13 +51,28 @@ Lokillo: ¡Ajá, mi llave! Todo bien, gracias a Dios. ¿Y tú cómo vas, compae?
 You: exit
 ```
 
-Type `exit` (or press Ctrl+C / Ctrl+D) to quit.
+Type `exit` (or press Ctrl+C / Ctrl+D) to quit. Replies are streamed token by token.
 
-### Resuming conversations
+### Options
+
+| Flag | Description |
+|---|---|
+| `--provider {openai,ollama}` | LLM provider (default: `PROVIDER` from `.env`) |
+| `--model NAME` | Model to use (default: the provider's model from `.env`) |
+| `--temperature N` | Sampling temperature between 0 and 2 (default: model default) |
+| `--system "PROMPT"` | System prompt (default: the resumed conversation's prompt, or Lokillo) |
+
+```bash
+python main.py --system "Eres un tutor de Python" --temperature 0.2
+python main.py --provider ollama --model llama3.2
+```
+
+### Managing conversations
 
 ```bash
 python main.py --list        # show recent conversations
 python main.py --resume 1    # continue conversation 1
+python main.py --delete 1    # delete conversation 1 and its messages
 ```
 
 ```

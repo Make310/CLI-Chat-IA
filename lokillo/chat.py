@@ -1,7 +1,11 @@
+from collections.abc import Iterator
+
 from openai import OpenAI
 
 from lokillo.models import Conversation, Message
 from lokillo.repository import ConversationRepository
+
+TEXT_DELTA_EVENT = "response.output_text.delta"
 
 
 class ChatService:
@@ -13,33 +17,48 @@ class ChatService:
         repository: ConversationRepository,
         model: str,
         instructions: str,
+        temperature: float | None = None,
         conversation: Conversation | None = None,
     ):
         self.client = client
         self.repository = repository
         self.model = model
         self.instructions = instructions
+        self.temperature = temperature
         self.conversation = conversation or Conversation()
 
-    def send(self, user_input: str) -> str:
-        """Sends the user input with the full history and returns the reply."""
+    def send(self, user_input: str) -> Iterator[str]:
+        """Streams the reply chunk by chunk and saves it once complete."""
         if self.conversation.id is None:
             self.conversation.id = self.repository.create_conversation()
 
-        response = self.client.responses.create(
+        stream = self.client.responses.create(
             model=self.model,
             instructions=self.instructions,
             input=self._build_input(user_input),
+            stream=True,
+            **self._optional_params(),
         )
+
+        chunks = []
+        for event in stream:
+            if event.type == TEXT_DELTA_EVENT:
+                chunks.append(event.delta)
+                yield event.delta
 
         message = Message(
             user_prompt=user_input,
             system_prompt=self.instructions,
-            output_text=response.output_text,
+            output_text="".join(chunks),
         )
         self.repository.add_message(self.conversation.id, message)
         self.conversation.messages.append(message)
-        return response.output_text
+
+    def _optional_params(self) -> dict[str, float]:
+        """Only sends parameters that were set, so model defaults apply."""
+        if self.temperature is None:
+            return {}
+        return {"temperature": self.temperature}
 
     def _build_input(self, user_input: str) -> list[dict[str, str]]:
         """Builds the user/assistant history followed by the new prompt."""
