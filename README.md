@@ -36,6 +36,18 @@ You: exit
 
 Type `exit` (or press Ctrl+C / Ctrl+D) to quit.
 
+### Resuming conversations
+
+```bash
+python main.py --list        # show recent conversations
+python main.py --resume 1    # continue conversation 1
+```
+
+```
+[2] 2026-11-14 03:42:30  (1 messages)  Buenas, que más
+[1] 2026-11-14 03:40:12  (3 messages)  Me llamo Pedro
+```
+
 ## How it works
 
 - **Memory:** each request sends the `previous_response_id` of the previous response, so the model keeps the session context.
@@ -52,6 +64,7 @@ sqlite3 conversations.db "SELECT user_prompt, output_text FROM messages WHERE co
 ```
 .
 ├── main.py              # Entry point: configuration and terminal loop
+├── cli.py               # Command-line arguments and conversation listing
 ├── chat.py              # ChatService: API calls and session memory
 ├── models.py            # Message and Conversation models (Pydantic)
 ├── repository.py        # SQLite persistence

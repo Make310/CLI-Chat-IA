@@ -10,3 +10,10 @@ class Message(BaseModel):
 class Conversation(BaseModel):
     id: int | None = None  # None until saved to the database
     last_response_id: str | None = None
+
+
+class ConversationSummary(BaseModel):
+    id: int
+    updated_at: str
+    first_prompt: str
+    message_count: int
